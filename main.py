@@ -1,40 +1,21 @@
-import os
-from logicverse import LogicVerseAgent, registry
-from logicverse import MockLLM, OpenAILLM, load_env
-
-# 1. 自动读取 .env 文件中的环境变量
-load_env()
-
-# 2. 定义业务工具
-@registry.tool
-def calculate(expression: str) -> str:
-    """计算数学表达式的结果"""
-    try:
-        return str(eval(expression))
-    except Exception as e:
-        return f"计算错误: {e}"
-
-@registry.tool
-def demo_tool(query: str) -> str:
-    """一个模拟的外部数据查询工具"""
-    return f"接收到查询: {query}。数据一切正常！"
+from logicverse.llms.factory import LLMFactory
 
 def main():
-    # --- 模式 A：断网跑通测试 (默认开启) ---
-    llm = MockLLM()
+    # 1. 工厂模式：根据 .env 自动生产大脑
+    # 不管你是用 DeepSeek 还是本地 Ollama，只要 LLM_PROVIDER=openai，这一行代码全搞定
+    try:
+        llm = LLMFactory.create()
+    except Exception as e:
+        print(e)
+        return
 
-    # --- 模式 B：接入真实大模型 (配置好 .env 后取消下方注释) ---
-    # api_key = os.getenv("DEEPSEEK_API_KEY")
-    # if api_key:
-    #     llm = OpenAILLM(
-    #         api_key=api_key, 
-    #         base_url="https://api.deepseek.com/v1", 
-    #         model="deepseek-chat"
-    #     )
+    # 2. 交付给 Agent 使用
+    # agent = LogicVerseAgent(llm=llm)
+    # agent.run("你的任务...")
     
-    # 3. 运行框架
-    agent = LogicVerseAgent(llm=llm)
-    agent.run("测试一下工具调用机制是否顺畅")
+    # 测试一下
+    print(f"✅ 引擎装配成功！当前模型: {llm.model}")
+    print(llm.chat("你好，请确认你的身份。"))
 
 if __name__ == "__main__":
     main()
