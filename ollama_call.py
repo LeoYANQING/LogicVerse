@@ -198,6 +198,9 @@ class VLMAPI:
         Returns:
             str: API响应内容
         """
+
+
+        
         # 构建完整的提示文本
         full_prompt = f"{systext}\n\n{usertext}"
         
