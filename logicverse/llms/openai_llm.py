@@ -1,24 +1,23 @@
 from .base import BaseLLM
-from logicverse.utils.config import LLMConfig  # 引入你写的强大配置类
 
 class OpenAILLM(BaseLLM):
-    """适配 OpenAI 接口格式的大模型 (兼容 DeepSeek, Qwen, 本地 Ollama 等)"""
+    """适配 OpenAI 接口格式的大模型 (纯净接口版：完全由外部注入参数)"""
     
-    def __init__(self, api_key: str = None, model: str = None, base_url: str = None, proxy: str = None):
+    def __init__(self, api_key: str, model: str, base_url: str = None, proxy: str = None):
         try:
             from openai import OpenAI
         except ImportError:
             raise ImportError("请先安装 openai 库: pip install openai")
 
-        # 1. 动态优先级：手动传入参数 > 你的 LLMConfig 统一提取
-        self.api_key = api_key or LLMConfig.get_api_key()
-        self.model = model or LLMConfig.get_model()
-        self.base_url = base_url or LLMConfig.get_base_url()
-        self.proxy = proxy or LLMConfig.get_proxy()
+        # 1. 极致纯净：只接收外部传进来的参数，绝不去读任何配置
+        self.api_key = api_key
+        self.model = model
+        self.base_url = base_url
+        self.proxy = proxy
 
-        # 安全阻断：有了 dummy-key 保护，这里只需要校验 model 即可
-        if not self.model:
-            raise ValueError("引擎启动失败：未检测到 LLM_MODEL，请检查 .env 配置。")
+        # 强校验：既然是你外面传进来的，那就必须传完整
+        if not self.api_key or not self.model:
+            raise ValueError("引擎启动失败：必须明确提供 api_key 和 model 参数。")
 
         # 2. 智能网络代理路由
         http_client = None

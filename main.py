@@ -1,52 +1,66 @@
+from logicverse.utils.config import LLMConfig
 from logicverse.llms.factory import LLMFactory
-# 如果你想测试完整的 Agent，可以把下面的注释打开
-# from logicverse import LogicVerseAgent, registry
+from logicverse import LogicVerseAgent, registry
+
+# 1. 注册工具池 (所有工具都在这，但我们会按需分配给不同的 Agent)
+@registry.tool
+def search_arxiv(query: str) -> str:
+    """搜索最新的学术论文"""
+    return f"检索到关于 '{query}' 的论文：基于多目标跟踪 (MOT) 与 LogicVerse 框架的新范式。"
+
+@registry.tool
+def write_python_code(requirements: str) -> str:
+    """根据需求编写 Python 框架代码"""
+    return f"def mot_tracker():\n    # 实现 {requirements}\n    pass"
 
 def main():
-    print("🚀 === LogicVerse 引擎双模式装配测试 ===\n")
+    print("🚀 === LogicVerse Multi-Agent 协同网络 ===\n")
+    
+    # 共用同一个配置，或者你可以给 Coder 分配一个更强的模型配置
+    config = LLMConfig().load_env()
+    base_llm = LLMFactory.create(config)
 
     # ==========================================
-    # 模式一：全自动装配 (推荐日常开发使用)
-    # 核心优势：代码里没有任何敏感信息，完全通过 .env 驱动
+    # 🕵️‍♂️ 智能体 A：首席学术研究员
+    # 它的权限：只能使用搜索工具，不能写代码
     # ==========================================
-    print("👉 [测试一] 读取 .env 自动装配")
-    try:
-        # 零参数，全靠工厂和配置中心的默契配合
-        llm_auto = LLMFactory.create()
-        print(f"✅ 自动装配成功！当前模型: {llm_auto.model}")
-        
-        # 真正的网络请求测试
-        print(f"🤖 模型回复:\n{llm_auto.chat('你好，请用一句话介绍你的身份。')}\n")
-    except Exception as e:
-        print(f"❌ 自动装配失败: {e}\n")
-
+    researcher = LogicVerseAgent(
+        name="Researcher_Z",
+        role="你是一位顶尖的 AI 学术研究员，擅长检索文献并提炼核心算法思想。你需要给出清晰的方法论摘要。",
+        llm=base_llm,
+        tools=["search_arxiv"] # 专属工具
+    )
 
     # ==========================================
-    # 模式二：代码传参强制装配 (适合多模型对比 / 动态租户切换)
-    # 核心优势：无视 .env 的默认值，利用高优先级参数强行覆盖
+    # 👨‍💻 智能体 B：高级算法工程师
+    # 它的权限：只能写代码，不需要去搜索
     # ==========================================
-    print("👉 [测试二] 代码手动传参装配 (覆盖 .env)")
-    try:
-        # 假设你在做“模型竞技场”，临时拉起一个 Qwen 阿里云百炼接口
-        llm_manual = LLMFactory.create(
-            provider="openai",  # 依然走 OpenAI 兼容协议
-            model="qwen-turbo", # 强行指定模型名
-            api_key="sk-dummy-key-for-test-123", # 强行传入别的 Key
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1" # 强行覆盖 URL
-        )
-        print(f"✅ 参数装配成功！当前模型: {llm_manual.model}")
-        
-        # 验证容错能力：因为我们故意填了假 Key，这里必定会触发我们在 openai_llm.py 里写的 except 兜底机制！
-        print(f"🤖 容错机制测试 (预期返回 JSON 报错格式):\n{llm_manual.chat('你好')}\n")
-    except Exception as e:
-        print(f"❌ 参数装配失败: {e}\n")
-
+    coder = LogicVerseAgent(
+        name="Coder_W",
+        role="你是一位资深的算法工程师。你的任务是接收研究员的理论方案，并将其转化为结构清晰的 Python 代码框架。",
+        llm=base_llm,
+        tools=["write_python_code"] # 专属工具
+    )
 
     # ==========================================
-    # 进阶玩法：交付给真正的 Agent 大脑
+    # 🤝 工作流串联 (The Multi-Agent Workflow)
     # ==========================================
-    # agent = LogicVerseAgent(llm=llm_auto)
-    # agent.run("请告诉我你是谁，并且证明你能思考。")
+    user_goal = "去调查一下最新的 MOT (多目标跟踪) 算法，然后给我写一个基础的代码实现框架。"
+    print(f"🎯 最终用户目标: {user_goal}\n")
+    print("-" * 50)
+
+    # 阶段一：研究员工作
+    research_report = researcher.run("调查最新的 MOT 算法核心思想。")
+    print(f"\n📄 研究报告产出:\n{research_report}\n")
+    print("-" * 50)
+
+    # 阶段二：工程师接手 (将前一个 Agent 的输出作为 Context 传给下一个)
+    code_result = coder.run(
+        query="根据研究员的报告，写出基础的代码框架。",
+        context=f"【前置研究报告】:\n{research_report}"
+    )
+    
+    print("\n🎉 Multi-Agent 协作完成！最终代码产出:\n" + code_result)
 
 if __name__ == "__main__":
     main()
