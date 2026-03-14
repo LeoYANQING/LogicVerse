@@ -1,66 +1,118 @@
+import os
+import sys
 from logicverse.utils.config import LLMConfig
 from logicverse.llms.factory import LLMFactory
-from logicverse import LogicVerseAgent, registry
+from logicverse.core.agent import LogicVerseAgent
+from logicverse.tools.registry import registry
+from logicverse.skills.loader import SkillLoader  # 🌟 引入核心的 DLC 装配引擎
 
-# 1. 注册工具池 (所有工具都在这，但我们会按需分配给不同的 Agent)
-@registry.tool
-def search_arxiv(query: str) -> str:
-    """搜索最新的学术论文"""
-    return f"检索到关于 '{query}' 的论文：基于多目标跟踪 (MOT) 与 LogicVerse 框架的新范式。"
+# ==========================================
+# 🛠️ 传统方式：定义基础的通用魔法工具
+# ==========================================
 
 @registry.tool
-def write_python_code(requirements: str) -> str:
-    """根据需求编写 Python 框架代码"""
-    return f"def mot_tracker():\n    # 实现 {requirements}\n    pass"
+def get_weather(city: str) -> str:
+    """获取指定城市的天气情况。参数 city 是城市中文名。"""
+    weather_db = {
+        "北京": "晴朗，气温 25°C，适合出行",
+        "上海": "小雨，气温 18°C，建议带伞",
+        "深圳": "多云，气温 28°C，有些闷热"
+    }
+    return weather_db.get(city, f"抱歉，暂时无法获取 {city} 的天气数据。")
+
+@registry.tool
+def calculate_math(expression: str) -> str:
+    """执行复杂的数学计算。参数 expression 必须是合法的 Python 数学表达式，如 '1024 * 3.14'。"""
+    try:
+        result = eval(expression)
+        return f"计算成功，结果为: {result}"
+    except Exception as e:
+        return f"数学表达式错误: {e}"
+
+
+# ==========================================
+# 🚀 主程序：双轨制全链路演示
+# ==========================================
 
 def main():
-    print("🚀 === LogicVerse Multi-Agent 协同网络 ===\n")
-    
-    # 共用同一个配置，或者你可以给 Coder 分配一个更强的模型配置
+    print("🌟 === 启动 LogicVerse 智能生态系统 === \n")
+
+    # 1. 挂载动力引擎 (读取 .env 配置)
+    print("⚙️ 正在装配底层大模型引擎...")
     config = LLMConfig().load_env()
-    base_llm = LLMFactory.create(config)
-
-    # ==========================================
-    # 🕵️‍♂️ 智能体 A：首席学术研究员
-    # 它的权限：只能使用搜索工具，不能写代码
-    # ==========================================
-    researcher = LogicVerseAgent(
-        name="Researcher_Z",
-        role="你是一位顶尖的 AI 学术研究员，擅长检索文献并提炼核心算法思想。你需要给出清晰的方法论摘要。",
-        llm=base_llm,
-        tools=["search_arxiv"] # 专属工具
-    )
-
-    # ==========================================
-    # 👨‍💻 智能体 B：高级算法工程师
-    # 它的权限：只能写代码，不需要去搜索
-    # ==========================================
-    coder = LogicVerseAgent(
-        name="Coder_W",
-        role="你是一位资深的算法工程师。你的任务是接收研究员的理论方案，并将其转化为结构清晰的 Python 代码框架。",
-        llm=base_llm,
-        tools=["write_python_code"] # 专属工具
-    )
-
-    # ==========================================
-    # 🤝 工作流串联 (The Multi-Agent Workflow)
-    # ==========================================
-    user_goal = "去调查一下最新的 MOT (多目标跟踪) 算法，然后给我写一个基础的代码实现框架。"
-    print(f"🎯 最终用户目标: {user_goal}\n")
-    print("-" * 50)
-
-    # 阶段一：研究员工作
-    research_report = researcher.run("调查最新的 MOT 算法核心思想。")
-    print(f"\n📄 研究报告产出:\n{research_report}\n")
-    print("-" * 50)
-
-    # 阶段二：工程师接手 (将前一个 Agent 的输出作为 Context 传给下一个)
-    code_result = coder.run(
-        query="根据研究员的报告，写出基础的代码框架。",
-        context=f"【前置研究报告】:\n{research_report}"
-    )
     
-    print("\n🎉 Multi-Agent 协作完成！最终代码产出:\n" + code_result)
+    if not config.get_value("API_KEY"):
+        print("❌ 致命错误: 未在 .env 文件中检测到 LLM_API_KEY！")
+        sys.exit(1)
+
+    try:
+        llm = LLMFactory.create(config)
+    except Exception as e:
+        print(f"❌ 引擎装配失败: {e}")
+        sys.exit(1)
+
+
+    # ==========================================
+    # 🧪 演示 1：传统方式 (手动挂载工具)
+    # ==========================================
+    print("\n" + "="*50)
+    print(" 🧪 演示 1：传统方式 (手动配置单体 Agent)")
+    print("="*50)
+    
+    agent_classic = LogicVerseAgent(
+        name="生活管家_Alpha",
+        role="你是一位贴心且严谨的生活管家。遇到天气或计算问题，请务必使用工具。一旦拿到所有需要的数据，请立即给出友好的最终回复，并调用 finish 结束任务。",
+        llm=llm,
+        tools=["get_weather", "calculate_math"], 
+        max_steps=5 
+    )
+
+    query_classic = "我明天要去北京出差，请帮我查一下天气。另外，帮我算一下 128 的 3 次方是多少？"
+    print(f"\n🗣️ 用户指令: {query_classic}")
+    try:
+        final_answer = agent_classic.run(query_classic)
+        print(f"\n🎉 最终回复:\n{final_answer}")
+    except Exception as e:
+        print(f"\n❌ 执行异常: {e}")
+
+
+    # ==========================================
+    # 🧩 演示 2：DLC 式装配 (全自动加载外部技能包)
+    # ==========================================
+    print("\n\n" + "="*50)
+    print(" 🧩 演示 2：面向未来的 DLC 技能装配 (Multi-Agent 生态)")
+    print("="*50)
+
+    test_skill_dir = "./skills/academic_researcher"
+    print(f"👉 尝试全自动挂载外部技能包: {test_skill_dir}")
+
+    if not os.path.exists(test_skill_dir):
+        print(f"   ⚠️ 未检测到技能包目录 {test_skill_dir}，跳过演示。")
+        print("   💡 请参照 README 在根目录建立该文件夹即可体验魔法。")
+    else:
+        try:
+            # 🌟 核心高光：只要一个文件夹路径，直接解析出 Prompt 和 专属工具！
+            skill_package = SkillLoader.load(test_skill_dir)
+            
+            # 瞬间造出全副武装的专业研究员 Agent
+            agent_expert = LogicVerseAgent(
+                name="学术专家_DLC",
+                role=skill_package["role"],   # 自动提取自 SKILL.md
+                llm=llm,
+                tools=skill_package["tools"], # 自动捕获自 scripts/
+                max_steps=5
+            )
+
+            query_skill = "请帮我检索一下关于 deep learning的最新论文，并告诉我核心思想。"
+            print(f"\n🗣️ 用户指令: {query_skill}")
+            final_answer2 = agent_expert.run(query_skill)
+            
+            print(f"\n🎉 最终回复:\n{final_answer2}")
+            
+        except Exception as e:
+            print(f"❌ 技能包装配或执行失败: {e}")
+
+    print("\n🌟 === 所有演示流程结束 === 🌟")
 
 if __name__ == "__main__":
     main()

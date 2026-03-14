@@ -12,7 +12,7 @@ class LogicVerseAgent:
         self.role = role        # Agent 的系统人设 (System Prompt)
         self.llm = llm          # Agent 的大脑 (注入的 OpenAILLM 实例)
         self.tools = tools or [] # Agent 的专属工具权限列表 (如: ["search_papers"])
-        self.memory = memory or MemoryBuffer()
+        self.memory = MemoryBuffer()
         self.max_steps = max_steps
 
     def _get_allowed_tools(self) -> dict:
